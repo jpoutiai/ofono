@@ -64,6 +64,7 @@ gdbus_libgdbus_internal_la_SOURCES = gdbus/gdbus.h \
 				gdbus/mainloop.c gdbus/watch.c \
 				gdbus/object.c gdbus/client.c gdbus/polkit.c
 
+if ATMODEM
 gatchat_sources = gatchat/gatchat.h gatchat/gatchat.c \
 				gatchat/gatresult.h gatchat/gatresult.c \
 				gatchat/gatsyntax.h gatchat/gatsyntax.c \
@@ -83,7 +84,9 @@ gatchat_sources = gatchat/gatchat.h gatchat/gatchat.c \
 				gatchat/ppp_cp.c gatchat/ppp_lcp.c \
 				gatchat/ppp_auth.c gatchat/ppp_net.c \
 				gatchat/ppp_ipcp.c gatchat/ppp_ipv6cp.c
+endif
 
+if ISIMODEM
 gisi_sources = gisi/client.c gisi/client.h gisi/common.h \
 				gisi/iter.c gisi/iter.h \
 				gisi/message.c gisi/message.h \
@@ -94,7 +97,9 @@ gisi_sources = gisi/client.c gisi/client.h gisi/common.h \
 				gisi/pipe.c gisi/pipe.h \
 				gisi/server.c gisi/server.h \
 				gisi/socket.c gisi/socket.h
+endif
 
+if RILMODEM
 gril_sources = gril/gril.h gril/gril.c gril/grilio.h \
 				gril/grilio.c gril/grilutil.h \
 				gril/grilutil.c gril/ringbuffer.h \
@@ -103,6 +108,11 @@ gril_sources = gril/gril.h gril/gril.c gril/grilio.h \
 				gril/grilreply.c gril/grilreply.h \
 				gril/grilrequest.c gril/grilrequest.h \
 				gril/grilunsol.c gril/grilunsol.h
+
+if !ATMODEM
+gril_sources += gril/ringbuffer.c
+endif
+endif
 
 btio_sources = btio/btio.h btio/btio.c
 
@@ -564,7 +574,7 @@ src_ofonod_SOURCES = $(builtin_sources) src/ofono.ver \
 			src/smsagent.c src/smsagent.h src/ctm.c \
 			src/cdma-voicecall.c src/sim-auth.c \
 			src/message.h src/message.c src/gprs-provision.c \
-			src/emulator.c src/location-reporting.c \
+			src/location-reporting.c \
 			src/cdma-connman.c src/gnss.c \
 			src/gnssagent.c src/gnssagent.h \
 			src/cdma-smsutil.h src/cdma-smsutil.c \
@@ -572,6 +582,10 @@ src_ofonod_SOURCES = $(builtin_sources) src/ofono.ver \
 			src/cdma-provision.c src/handsfree.c \
 			src/handsfree-audio.c src/bluetooth.h \
 			src/hfp.h src/sim-mnclength.c
+
+if ATMODEM
+src_ofonod_SOURCES += src/emulator.c
+endif
 
 src_ofonod_LDADD = gdbus/libgdbus-internal.la $(builtin_libadd) \
 			@GLIB_LIBS@ @DBUS_LIBS@ -ldl
@@ -734,7 +748,12 @@ unit_tests = unit/test-common unit/test-util unit/test-idmap \
 				unit/test-sms unit/test-cdmasms
 
 noinst_PROGRAMS = $(unit_tests) \
-			unit/test-sms-root unit/test-mux unit/test-caif
+			unit/test-sms-root
+
+if ATMODEM
+noinst_PROGRAMS += unit/test-mux \
+			unit/test-caif
+endif
 
 unit_test_common_SOURCES = unit/test-common.c src/common.c src/util.c
 unit_test_common_LDADD = @GLIB_LIBS@
@@ -773,6 +792,7 @@ unit_test_sms_root_SOURCES = unit/test-sms-root.c \
 unit_test_sms_root_LDADD = @GLIB_LIBS@
 unit_objects += $(unit_test_sms_root_OBJECTS)
 
+if ATMODEM
 unit_test_mux_SOURCES = unit/test-mux.c $(gatchat_sources)
 unit_test_mux_LDADD = @GLIB_LIBS@
 unit_objects += $(unit_test_mux_OBJECTS)
@@ -782,21 +802,39 @@ unit_test_caif_SOURCES = unit/test-caif.c $(gatchat_sources) \
 					drivers/stemodem/if_caif.h
 unit_test_caif_LDADD = @GLIB_LIBS@
 unit_objects += $(unit_test_caif_OBJECTS)
+endif
 
+if RILMODEM
 unit_test_grilrequest_SOURCES = unit/test-grilrequest.c $(gril_sources) \
-				src/log.c gatchat/ringbuffer.c
+				src/log.c
+
+if ATMODEM
+unit_test_grilrequest_SOURCES += gatchat/ringbuffer.c
+endif
+
 unit_test_grilrequest_LDADD = @GLIB_LIBS@ -ldl
 unit_objects += $(unit_test_grilrequest_OBJECTS)
 
 unit_test_grilreply_SOURCES = unit/test-grilreply.c $(gril_sources) \
-				src/log.c gatchat/ringbuffer.c
+				src/log.c
+
+if ATMODEM
+unit_test_grilreply_SOURCES += gatchat/ringbuffer.c
+endif
+
 unit_test_grilreply_LDADD = @GLIB_LIBS@ -ldl
 unit_objects += $(unit_test_grilreply_OBJECTS)
 
 unit_test_grilunsol_SOURCES = unit/test-grilunsol.c $(gril_sources) \
-				src/log.c gatchat/ringbuffer.c
+				src/log.c
+
+if ATMODEM
+unit_test_grilunsol_SOURCES += gatchat/ringbuffer.c
+endif
+
 unit_test_grilunsol_LDADD = @GLIB_LIBS@ -ldl
 unit_objects += $(unit_test_grilunsol_OBJECTS)
+endif
 
 TESTS = $(unit_tests)
 
@@ -842,6 +880,7 @@ endif
 
 if BLUETOOTH
 if DUNDEE
+if ATMODEM
 sbin_PROGRAMS += dundee/dundee
 
 dundee_common_sources = $(gatchat_sources) \
@@ -868,7 +907,9 @@ dundee_dundee_SOURCES = $(dundee_common_sources) plugins/bluez5.c \
 endif
 endif
 endif
+endif
 
+if ATMODEM
 noinst_PROGRAMS += gatchat/gsmdial gatchat/test-server gatchat/test-qcdm
 
 gatchat_gsmdial_SOURCES = gatchat/gsmdial.c $(gatchat_sources)
@@ -879,7 +920,7 @@ gatchat_test_server_LDADD = @GLIB_LIBS@ -lutil
 
 gatchat_test_qcdm_SOURCES = gatchat/test-qcdm.c $(gatchat_sources)
 gatchat_test_qcdm_LDADD = @GLIB_LIBS@
-
+endif
 
 DISTCHECK_CONFIGURE_FLAGS = --disable-datafiles \
 				--enable-dundee --enable-tools
