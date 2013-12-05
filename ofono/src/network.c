@@ -1319,7 +1319,7 @@ static void signal_strength_callback(const struct ofono_error *error,
 
 	ofono_netreg_strength_notify(netreg, strength);
 }
-
+#ifdef ATMODEM
 static void notify_emulator_status(struct ofono_atom *atom, void *data)
 {
 	struct ofono_emulator *em = __ofono_atom_get_data(atom);
@@ -1338,7 +1338,7 @@ static void notify_emulator_status(struct ofono_atom *atom, void *data)
 		ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_ROAMING, 0);
 	}
 }
-
+#endif
 void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 			int lac, int ci, int tech)
 {
@@ -1354,10 +1354,12 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 		set_registration_status(netreg, status);
 
 		modem = __ofono_atom_get_modem(netreg->atom);
+#ifdef ATMODEM
 		__ofono_modem_foreach_registered_atom(modem,
 					OFONO_ATOM_TYPE_EMULATOR_HFP,
 					notify_emulator_status,
 					GINT_TO_POINTER(netreg->status));
+#endif
 	}
 
 	if (netreg->location != lac)
@@ -1505,7 +1507,7 @@ static void init_registration_status(const struct ofono_error *error,
 						sim_csp_changed, netreg, NULL);
 	}
 }
-
+#ifdef ATMODEM
 static void notify_emulator_strength(struct ofono_atom *atom, void *data)
 {
 	struct ofono_emulator *em = __ofono_atom_get_data(atom);
@@ -1516,7 +1518,7 @@ static void notify_emulator_strength(struct ofono_atom *atom, void *data)
 
 	ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_SIGNAL, val);
 }
-
+#endif
 void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
@@ -1548,10 +1550,12 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 	}
 
 	modem = __ofono_atom_get_modem(netreg->atom);
+#ifdef ATMODEM
 	__ofono_modem_foreach_registered_atom(modem,
 				OFONO_ATOM_TYPE_EMULATOR_HFP,
 				notify_emulator_strength,
 				GINT_TO_POINTER(netreg->signal_strength));
+#endif
 }
 
 static void sim_opl_read_cb(int ok, int length, int record,
@@ -1761,14 +1765,14 @@ void ofono_netreg_driver_unregister(const struct ofono_netreg_driver *d)
 
 	g_drivers = g_slist_remove(g_drivers, (void *) d);
 }
-
+#ifdef ATMODEM
 static void emulator_remove_handler(struct ofono_atom *atom, void *data)
 {
 	struct ofono_emulator *em = __ofono_atom_get_data(atom);
 
 	ofono_emulator_remove_handler(em, data);
 }
-
+#endif
 static void netreg_unregister(struct ofono_atom *atom)
 {
 	struct ofono_netreg *netreg = __ofono_atom_get_data(atom);
@@ -1776,7 +1780,7 @@ static void netreg_unregister(struct ofono_atom *atom)
 	struct ofono_modem *modem = __ofono_atom_get_modem(atom);
 	const char *path = __ofono_atom_get_path(atom);
 	GSList *l;
-
+#ifdef ATMODEM
 	__ofono_modem_foreach_registered_atom(modem,
 						OFONO_ATOM_TYPE_EMULATOR_HFP,
 						notify_emulator_status,
@@ -1792,7 +1796,7 @@ static void netreg_unregister(struct ofono_atom *atom)
 						"+COPS");
 
 	__ofono_modem_remove_atom_watch(modem, netreg->hfp_watch);
-
+#endif
 	__ofono_watchlist_free(netreg->status_watches);
 	netreg->status_watches = NULL;
 
@@ -1998,7 +2002,7 @@ static void sim_spdi_changed(int id, void *userdata)
 			OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
 			sim_spdi_read_cb, netreg);
 }
-
+#ifdef ATMODEM
 static void emulator_cops_cb(struct ofono_emulator *em,
 			struct ofono_emulator_request *req, void *userdata)
 {
@@ -2059,7 +2063,7 @@ static void emulator_hfp_watch(struct ofono_atom *atom,
 	if (cond == OFONO_ATOM_WATCH_CONDITION_REGISTERED)
 		emulator_hfp_init(atom, data);
 }
-
+#endif
 void ofono_netreg_register(struct ofono_netreg *netreg)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
@@ -2121,10 +2125,11 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 	}
 
 	__ofono_atom_register(netreg->atom, netreg_unregister);
-
+#ifdef ATMODEM
 	netreg->hfp_watch = __ofono_modem_add_atom_watch(modem,
 					OFONO_ATOM_TYPE_EMULATOR_HFP,
 					emulator_hfp_watch, netreg, NULL);
+#endif
 }
 
 void ofono_netreg_remove(struct ofono_netreg *netreg)
