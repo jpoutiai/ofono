@@ -1468,6 +1468,7 @@ static gboolean query_manufacturer(gpointer user)
 	return FALSE;
 }
 
+#ifdef ATMODEM
 static void attr_template(struct ofono_emulator *em,
 				struct ofono_emulator_request *req,
 				const char *attr)
@@ -1538,6 +1539,7 @@ static void dun_watch(struct ofono_atom *atom,
 	ofono_emulator_add_handler(em, "+GMR", gmr_cb, data, NULL);
 	ofono_emulator_add_handler(em, "+GCAP", gcap_cb, data, NULL);
 }
+#endif
 
 int ofono_devinfo_driver_register(const struct ofono_devinfo_driver *d)
 {
@@ -1626,11 +1628,11 @@ void ofono_devinfo_register(struct ofono_devinfo *info)
 	struct ofono_modem *modem = __ofono_atom_get_modem(info->atom);
 
 	__ofono_atom_register(info->atom, devinfo_unregister);
-
+#ifdef ATMODEM
 	info->dun_watch = __ofono_modem_add_atom_watch(modem,
 						OFONO_ATOM_TYPE_EMULATOR_DUN,
 						dun_watch, info, NULL);
-
+#endif
 	query_manufacturer(info);
 }
 
