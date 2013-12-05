@@ -749,7 +749,7 @@ static void voicecall_emit_multiparty(struct voicecall *call, gboolean mpty)
 						"Multiparty", DBUS_TYPE_BOOLEAN,
 						&val);
 }
-
+#ifdef ATMODEM
 static void emulator_set_indicator_forced(struct ofono_voicecall *vc,
 						const char *name, int value)
 {
@@ -904,7 +904,7 @@ static void notify_emulator_call_status(struct ofono_voicecall *vc)
 						emulator_callheld_status_cb,
 						&data);
 }
-
+#endif
 static void voicecall_set_call_status(struct voicecall *call, int status)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
@@ -926,9 +926,9 @@ static void voicecall_set_call_status(struct voicecall *call, int status)
 						OFONO_VOICECALL_INTERFACE,
 						"State", DBUS_TYPE_STRING,
 						&status_str);
-
+#ifdef ATMODEM
 	notify_emulator_call_status(call->vc);
-
+#endif
 	if (status == CALL_STATUS_ACTIVE &&
 		(old_status == CALL_STATUS_INCOMING ||
 			old_status == CALL_STATUS_DIALING ||
@@ -1226,9 +1226,9 @@ static void voicecalls_emit_call_added(struct ofono_voicecall *vc,
 	DBusMessageIter iter;
 	DBusMessageIter dict;
 	const char *path;
-
+#ifdef ATMODEM
 	notify_emulator_call_status(vc);
-
+#endif
 	path = __ofono_atom_get_path(vc->atom);
 
 	signal = dbus_message_new_signal(path,
@@ -2407,8 +2407,10 @@ static void send_ciev_after_swap_callback(const struct ofono_error *error,
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
 		reply = dbus_message_new_method_return(vc->pending);
+#ifdef ATMODEM
 		emulator_set_indicator_forced(vc, OFONO_EMULATOR_IND_CALLHELD,
 					OFONO_EMULATOR_CALLHELD_MULTIPLE);
+#endif
 	} else
 		reply = __ofono_error_failed(vc->pending);
 
@@ -2649,7 +2651,7 @@ void ofono_voicecall_driver_unregister(const struct ofono_voicecall_driver *d)
 
 	g_drivers = g_slist_remove(g_drivers, (void *) d);
 }
-
+#ifdef ATMODEM
 static void emulator_remove_handler(struct ofono_atom *atom, void *data)
 {
 	struct ofono_emulator *em = __ofono_atom_get_data(atom);
@@ -2704,7 +2706,7 @@ static void emulator_hfp_unregister(struct ofono_atom *atom)
 
 	__ofono_modem_remove_atom_watch(modem, vc->hfp_watch);
 }
-
+#endif
 static void voicecall_load_settings(struct ofono_voicecall *vc)
 {
 	const char *imsi;
@@ -2739,9 +2741,9 @@ static void voicecall_unregister(struct ofono_atom *atom)
 	struct ofono_modem *modem = __ofono_atom_get_modem(atom);
 	const char *path = __ofono_atom_get_path(atom);
 	GSList *l;
-
+#ifdef ATMODEM
 	emulator_hfp_unregister(atom);
-
+#endif
 	voicecall_close_settings(vc);
 
 	if (vc->sim_state_watch) {
@@ -2916,7 +2918,7 @@ static void sim_watch(struct ofono_atom *atom,
 
 	sim_state_watch(ofono_sim_get_state(sim), vc);
 }
-
+#ifdef ATMODEM
 static void emulator_send_ciev_after_swap_cb(const struct ofono_error *error,
 								void *data)
 {
@@ -3542,7 +3544,7 @@ static void emulator_hfp_watch(struct ofono_atom *atom,
 	ofono_emulator_add_handler(em, "D", emulator_atd_cb, vc, NULL);
 	ofono_emulator_add_handler(em, "+BLDN", emulator_bldn_cb, vc, NULL);
 }
-
+#endif
 void ofono_voicecall_register(struct ofono_voicecall *vc)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
@@ -3576,10 +3578,11 @@ void ofono_voicecall_register(struct ofono_voicecall *vc)
 						sim_watch, vc, NULL);
 
 	__ofono_atom_register(vc->atom, voicecall_unregister);
-
+#ifdef ATMODEM
 	vc->hfp_watch = __ofono_modem_add_atom_watch(modem,
 					OFONO_ATOM_TYPE_EMULATOR_HFP,
 					emulator_hfp_watch, vc, NULL);
+#endif
 }
 
 void ofono_voicecall_remove(struct ofono_voicecall *vc)
