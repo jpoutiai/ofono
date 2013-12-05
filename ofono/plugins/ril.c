@@ -426,6 +426,7 @@ static void gril_disconnected(gpointer user_data)
 		reconnect_timer =
 			g_timeout_add_seconds(2, ril_re_init, NULL);
 	}
+}
 
 #define	RADIO_ID 1001
 void ril_switchUser()
