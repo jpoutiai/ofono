@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/stat.h>
-
+#include <time.h>
 #include <glib.h>
 
 #include <ofono/log.h>
@@ -67,6 +67,8 @@ static void ril_gprs_context_deactivate_primary(struct ofono_gprs_context *gc,
 static void set_context_disconnected(struct gprs_context_data *gcd)
 {
 	DBG("");
+	time_t clk = time(NULL);
+	DBG("%s", ctime(&clk));
 
 	gcd->active_ctx_cid = -1;
 	gcd->active_rild_cid = -1;
@@ -90,6 +92,10 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 	GSList *iterator = NULL;
 	struct ofono_error error;
 
+	DBG("JPO RIL_UNSOL_DATA_CALL_LIST_CHANGED");
+	DBG("JPO %s",ril_unsol_request_to_string(message->req));
+	time_t clk = time(NULL);
+	DBG("%s", ctime(&clk));
 	unsol = g_ril_unsol_parse_data_call_list(gcd->ril, message, &error);
 
 	if (error.type != OFONO_ERROR_TYPE_NO_ERROR)
@@ -99,20 +105,63 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 
 	for (iterator = unsol->call_list; iterator; iterator = iterator->next) {
 		call = (struct data_call *) iterator->data;
+		DBG("JPO cid=%u,active=%u",call->cid,call->active);
+		DBG("JPO active_rild_cid=%d,active_ctx_cid=%d",
+					gcd->active_rild_cid,gcd->active_ctx_cid);
+//		if (call->cid == gcd->active_rild_cid) {
+//			active_cid_found = TRUE;
 
-		if (call->cid == gcd->active_rild_cid) {
-			active_cid_found = TRUE;
+		if (call->active == 0) {
+			disconnect = TRUE;
+			ofono_gprs_context_deactivated(gc, gcd->active_ctx_cid);
+			/*JPO hack*/
+			break;
+			/**/
+		}
 
-			if (call->active == 0) {
-				disconnect = TRUE;
-				ofono_gprs_context_deactivated(gc, gcd->active_ctx_cid);
+		if (call->active == 2) {
+			char **split_ip_addr = NULL;
+			const char **dns_addresses;
+			if (call->ifname) {
+				DBG("JPO ifname:%s",call->ifname);
+				ofono_gprs_context_set_interface(gc,
+								call->ifname);
 			}
 
+			if (call->addresses) {
+				DBG("JPO addresses:%s",call->addresses);
+				ofono_gprs_context_set_ipv4_netmask(gc,
+					ril_util_get_netmask(call->addresses));
+
+				split_ip_addr = g_strsplit(call->addresses,
+									"/", 2);
+				DBG("JPO address:%s",split_ip_addr[0]);
+				ofono_gprs_context_set_ipv4_address(gc,
+							split_ip_addr[0], TRUE);
+			}
+
+			if (call->gateways) {
+				DBG("JPO gateways:%s",call->gateways);
+				ofono_gprs_context_set_ipv4_gateway(gc,
+								call->gateways);
+			}
+
+
+			if (call->dnses)
+				DBG("JPO dnses:%s",call->dnses);
+
+			dns_addresses =
+				(const char **)(call->dnses ?
+				g_strsplit((const gchar *)call->dnses, " ", 3) :
+									NULL);
+
+			ofono_gprs_context_set_ipv4_dns_servers(gc,
+								dns_addresses);
 			break;
 		}
 	}
 
-	if (disconnect || active_cid_found == FALSE) {
+	if (disconnect /*|| active_cid_found == FALSE*/) {
 		ofono_error("Clearing active context");
 		set_context_disconnected(gcd);
 	}
@@ -132,6 +181,8 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	char **split_ip_addr = NULL;
 
 	ofono_info("setting up data call");
+	time_t clk = time(NULL);
+	DBG("%s", ctime(&clk));
 
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("GPRS context: Reply failure: %s",
@@ -145,14 +196,16 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	}
 
 	reply = g_ril_reply_parse_data_call(gcd->ril, message, &error);
-
+	DBG("JPO2");
+	DBG("JPO gcd->active_rild_cid:%d reply->cid:%d",
+					gcd->active_rild_cid,reply->cid);
 	gcd->active_rild_cid = reply->cid;
 
 	if (error.type != OFONO_ERROR_TYPE_NO_ERROR) {
-		if (gcd->active_rild_cid != -1) {
+//		if (gcd->active_rild_cid != -1) {
 			ofono_error("no active context. disconnect");
-			disconnect_context(gc);
-		}
+//			disconnect_context(gc);
+//		}
 		goto error;
 	}
 
@@ -164,7 +217,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 		error.type = OFONO_ERROR_TYPE_FAILURE;
 		error.error = reply->status;
 
-		set_context_disconnected(gcd);
+//		set_context_disconnected(gcd);
 		goto error;
 	}
 
@@ -191,7 +244,8 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	}
 
 	gcd->state = STATE_ACTIVE;
-
+	clk = time(NULL);
+	DBG("%s", ctime(&clk));
 	ofono_gprs_context_set_interface(gc, reply->ifname);
 
 	/* TODO:
@@ -231,6 +285,8 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 	int ret = 0;
 
 	ofono_info("Activating context: %d", ctx->cid);
+	time_t clk = time(NULL);
+	DBG("%s", ctime(&clk));
 
 	cbd->user = gc;
 
@@ -293,7 +349,8 @@ static void ril_deactivate_data_call_cb(struct ril_msg *message, gpointer user_d
 	gint id = gcd->active_ctx_cid;
 
 	ofono_info("deactivating data call");
-
+	time_t clk = time(NULL);
+	DBG("%s", ctime(&clk));
 	/* Reply has no data... */
 	if (message->error == RIL_E_SUCCESS) {
 
@@ -333,7 +390,8 @@ static void ril_gprs_context_deactivate_primary(struct ofono_gprs_context *gc,
 	int ret = 0;
 
 	ofono_info("deactivate primary");
-
+	time_t clk = time(NULL);
+	DBG("%s", ctime(&clk));
 	if (gcd->active_rild_cid == -1) {
 		set_context_disconnected(gcd);
 
@@ -384,7 +442,8 @@ static void ril_gprs_context_detach_shutdown(struct ofono_gprs_context *gc,
 						unsigned int id)
 {
 	DBG("cid: %d", id);
-
+	time_t clk = time(NULL);
+	DBG("%s", ctime(&clk));
 	ril_gprs_context_deactivate_primary(gc, 0, NULL, NULL);
 }
 
@@ -393,7 +452,8 @@ static int ril_gprs_context_probe(struct ofono_gprs_context *gc,
 {
 	GRil *ril = data;
 	struct gprs_context_data *gcd;
-
+	time_t clk = time(NULL);
+	DBG("%s", ctime(&clk));
 	gcd = g_try_new0(struct gprs_context_data, 1);
 	if (gcd == NULL)
 		return -ENOMEM;
@@ -414,7 +474,8 @@ static void ril_gprs_context_remove(struct ofono_gprs_context *gc)
 	struct gprs_context_data *gcd = ofono_gprs_context_get_data(gc);
 
 	DBG("");
-
+	time_t clk = time(NULL);
+	DBG("%s", ctime(&clk));
 	if (gcd->state != STATE_IDLE) {
 		ril_gprs_context_detach_shutdown(gc, 0);
 	}
