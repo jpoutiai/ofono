@@ -900,6 +900,7 @@ static void pri_activate_callback(const struct ofono_error *error, void *data)
 	__ofono_dbus_pending_reply(&ctx->pending,
 				dbus_message_new_method_return(ctx->pending));
 
+	DBG("JPO2");
 	if (gc->settings->interface != NULL) {
 		pri_ifupdown(gc->settings->interface, TRUE);
 
@@ -1195,7 +1196,7 @@ static DBusMessage *pri_set_property(DBusConnection *conn,
 
 	dbus_message_iter_get_basic(&iter, &property);
 	dbus_message_iter_next(&iter);
-
+	DBG("property:%s",property);
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
 		return __ofono_error_invalid_args(msg);
 
@@ -1231,6 +1232,7 @@ static DBusMessage *pri_set_property(DBusConnection *conn,
 
 		ctx->pending = dbus_message_ref(msg);
 
+		DBG("Attached:%d",value);
 		if (value)
 			gc->driver->activate_primary(gc, &ctx->context,
 						pri_activate_callback, ctx);
@@ -1473,7 +1475,7 @@ static gboolean have_active_contexts(struct ofono_gprs *gprs)
 {
 	GSList *l;
 	struct pri_context *ctx;
-
+	DBG("");
 	for (l = gprs->contexts; l; l = l->next) {
 		ctx = l->data;
 
@@ -1488,7 +1490,7 @@ static void release_active_contexts(struct ofono_gprs *gprs)
 {
 	GSList *l;
 	struct pri_context *ctx;
-
+	DBG("JPO");
 	for (l = gprs->contexts; l; l = l->next) {
 		struct ofono_gprs_context *gc;
 
@@ -1514,14 +1516,15 @@ static void gprs_attached_update(struct ofono_gprs *gprs)
 	const char *path;
 	ofono_bool_t attached;
 	dbus_bool_t value;
-
+	DBG("driver_attached:%d,status:%d,gprs:%d",gprs->driver_attached, gprs->status, gprs->attached);
+	ofono_info("driver_attached:%d,status:%d,gprs:%d",gprs->driver_attached, gprs->status, gprs->attached);
 	attached = gprs->driver_attached &&
 		(gprs->status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
 			gprs->status == NETWORK_REGISTRATION_STATUS_ROAMING);
 
 	if (attached == gprs->attached)
 		return;
-
+	DBG("JPO1");
 	/*
 	 * If an active context is found, a PPP session might be still active
 	 * at driver level. "Attached" = TRUE property can't be signalled to
@@ -1535,8 +1538,9 @@ static void gprs_attached_update(struct ofono_gprs *gprs)
 		gprs->flags |= GPRS_FLAG_ATTACHED_UPDATE;
 		return;
 	}
-
+	DBG("JPO2");
 	gprs->attached = attached;
+	ofono_info("gprs_attached_update:gprs->attached %d", gprs->attached);
 
 	path = __ofono_atom_get_path(gprs->atom);
 	value = attached;
@@ -1554,12 +1558,12 @@ static void registration_status_cb(const struct ofono_error *error,
 		error->type, status);
 
 	gprs->flags &= ~GPRS_FLAG_ATTACHING;
-
+	DBG("JPO1 gprs->flags:%d",gprs->flags);
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		ofono_gprs_status_notify(gprs, status);
 	else
 		gprs_attached_update(gprs);
-
+	DBG("JPO2 gprs->flags & GPRS_FLAG_RECHECK:%d", gprs->flags & GPRS_FLAG_RECHECK);
 	if (gprs->flags & GPRS_FLAG_RECHECK) {
 		gprs->flags &= ~GPRS_FLAG_RECHECK;
 		gprs_netreg_update(gprs);
@@ -1575,6 +1579,7 @@ static void gprs_attach_callback(const struct ofono_error *error, void *data)
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
 		gprs->driver_attached = !gprs->driver_attached;
 
+	DBG("JPO gprs->driver_attached:%d", gprs->driver_attached);
 	if (gprs->driver->attached_status == NULL) {
 		struct ofono_error status_error;
 
@@ -1604,6 +1609,8 @@ static void gprs_netreg_update(struct ofono_gprs *gprs)
 {
 	ofono_bool_t attach;
 
+	DBG("JPO1");
+
 	attach = gprs->netreg_status == NETWORK_REGISTRATION_STATUS_REGISTERED;
 
 	attach = attach || (gprs->roaming_allowed &&
@@ -1620,7 +1627,7 @@ static void gprs_netreg_update(struct ofono_gprs *gprs)
 	}
 
 	gprs->flags |= GPRS_FLAG_ATTACHING;
-
+	DBG("JPO2");
 	gprs->driver->set_attached(gprs, attach, gprs_attach_callback, gprs);
 	gprs->driver_attached = attach;
 }
@@ -1632,7 +1639,7 @@ static void netreg_status_changed(int status, int lac, int ci, int tech,
 	struct ofono_gprs *gprs = data;
 
 	DBG("%d", status);
-
+	ofono_info("netreg_status_changed %d", status);
 	if (gprs->netreg_status == status)
 		return;
 
@@ -1649,7 +1656,7 @@ static DBusMessage *gprs_get_properties(DBusConnection *conn,
 	DBusMessageIter iter;
 	DBusMessageIter dict;
 	dbus_bool_t value;
-
+	DBG("");
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL)
 		return NULL;
@@ -2174,7 +2181,6 @@ void ofono_gprs_detached_notify(struct ofono_gprs *gprs)
 void ofono_gprs_status_notify(struct ofono_gprs *gprs, int status)
 {
 	DBG("%s status %d", __ofono_atom_get_path(gprs->atom), status);
-
 	gprs->status = status;
 
 	if (status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
@@ -2198,7 +2204,7 @@ void ofono_gprs_status_notify(struct ofono_gprs *gprs, int status)
 	if (gprs->roaming_allowed == FALSE &&
 			status == NETWORK_REGISTRATION_STATUS_ROAMING)
 		goto detach;
-
+	DBG("JPO");
 	gprs->driver_attached = TRUE;
 	gprs_attached_update(gprs);
 
@@ -2206,6 +2212,7 @@ void ofono_gprs_status_notify(struct ofono_gprs *gprs, int status)
 
 detach:
 	gprs->flags |= GPRS_FLAG_ATTACHING;
+	DBG("JPO detach");
 	gprs->driver->set_attached(gprs, FALSE, gprs_attach_callback, gprs);
 }
 
@@ -2444,7 +2451,7 @@ void ofono_gprs_context_set_interface(struct ofono_gprs_context *gc,
 					const char *interface)
 {
 	struct context_settings *settings = gc->settings;
-
+	DBG("JPO");
 	g_free(settings->interface);
 	settings->interface = g_strdup(interface);
 }
@@ -2457,7 +2464,7 @@ void ofono_gprs_context_set_ipv4_address(struct ofono_gprs_context *gc,
 
 	if (settings->ipv4 == NULL)
 		return;
-
+	DBG("JPO");
 	g_free(settings->ipv4->ip);
 	settings->ipv4->ip = g_strdup(address);
 	settings->ipv4->static_ip = static_ip;
@@ -2470,7 +2477,7 @@ void ofono_gprs_context_set_ipv4_netmask(struct ofono_gprs_context *gc,
 
 	if (settings->ipv4 == NULL)
 		return;
-
+	DBG("JPO");
 	g_free(settings->ipv4->netmask);
 	settings->ipv4->netmask = g_strdup(netmask);
 }
@@ -2482,7 +2489,7 @@ void ofono_gprs_context_set_ipv4_gateway(struct ofono_gprs_context *gc,
 
 	if (settings->ipv4 == NULL)
 		return;
-
+	DBG("JPO");
 	g_free(settings->ipv4->gateway);
 	settings->ipv4->gateway = g_strdup(gateway);
 }
@@ -2494,8 +2501,9 @@ void ofono_gprs_context_set_ipv4_dns_servers(struct ofono_gprs_context *gc,
 
 	if (settings->ipv4 == NULL)
 		return;
-
+	DBG("JPO");
 	g_strfreev(settings->ipv4->dns);
+	DBG("");
 	settings->ipv4->dns = g_strdupv((char **) dns);
 }
 
