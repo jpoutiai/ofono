@@ -227,10 +227,10 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 //			gd->notified = TRUE;
 			gd->rild_status = status;
 		} else {
-			if (gd->fake_timer_id > 0)
+			if (gd->fake_timer_id > 0) {
 				if (gd->true_status != status)
 					gd->true_status = status;
-			else {
+			} else {
 				struct cb_data *fake_cbd = cb_data_new(NULL, NULL);
 				fake_cbd->user = gprs;
 				gd->true_status = status;
@@ -252,6 +252,60 @@ error:
 	ofono_info("data registration status is %d", status);
 	if (cb)
 		cb(&error, status, cbd->data);
+}
+
+static void ril_data_probe_reg_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+//	ofono_gprs_status_cb_t cb = cbd->cb;
+	struct ofono_gprs *gprs = cbd->user;
+	struct gprs_data *gd = ofono_gprs_get_data(gprs);
+	struct ofono_error error;
+	int status, lac, ci, tech;
+	int max_cids = 1;
+	int id = RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED;
+	DBG("");
+	if (gd && message->error == RIL_E_SUCCESS) {
+		decode_ril_error(&error, "OK");
+	} else {
+		ofono_error("ril_data_reg_cb: reply failure: %s",
+				ril_error_to_string(message->error));
+		decode_ril_error(&error, "FAIL");
+		error.error = message->error;
+		status = NETWORK_REGISTRATION_STATUS_UNKNOWN;
+		goto out;
+	}
+	status = -1;
+	if (ril_util_parse_reg(gd->ril, message, &status,
+				&lac, &ci, &tech, &max_cids) == FALSE) {
+		ofono_error("Failure parsing data registration response.");
+		decode_ril_error(&error, "FAIL");
+		if (status == -1)
+			status = NETWORK_REGISTRATION_STATUS_UNKNOWN;
+		goto out;
+	}
+
+	ofono_gprs_register(gprs);
+	registered = TRUE;
+
+	if (max_cids > gd->max_cids) {
+		DBG("Setting max cids to %d", max_cids);
+		gd->max_cids = max_cids;
+		ofono_gprs_set_cid_range(gprs, 1, max_cids);
+	}
+
+	if (status == NETWORK_REGISTRATION_STATUS_ROAMING)
+		status = check_if_really_roaming(status);
+
+out:
+	ofono_info("data registration status is %d", status);
+
+	DBG("Starting to listen network status");
+	gd->registerid = g_ril_register(gd->ril,
+			id, ril_gprs_state_change, gprs);
+
+	gd->rild_status = status;
+
 }
 
 static void ril_gprs_registration_status(struct ofono_gprs *gprs,
